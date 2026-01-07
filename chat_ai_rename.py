@@ -17,7 +17,7 @@ class InvoiceInfo(BaseModel):
     issue_date: Optional[str] = Field(default=None, description="发票开票日期，格式为YYYY年MM月DD日（如：2025年02月27日）")
     buyer_name: Optional[str] = Field(default=None, description="购买方公司名称（如：武汉东湖学院）")
     buyer_tax_id: Optional[str] = Field(default=None, description="购买方统一社会信用代码/纳税人识别号")
-    seller_name: Optional[str] = Field(default=None, description="销售方公司名称（如：腾讯云计算（北京）有限责任公司）")
+    seller_name: Optional[str] = Field(default=None, description="店铺名称或销售方名称。如果是餐厅或超市，请提取招牌名（如：Starbucks, 7-Eleven, 吉野家, 便利店）。如果是公司发票，提取公司全名。保留原语言，不要翻译（日文保留日文，英文保留英文，中文保留中文）")
     seller_tax_id: Optional[str] = Field(default=None, description="销售方统一社会信用代码/纳税人识别号")
     total_amount: Optional[str] = Field(default=None, description="发票合计金额（不含税，如：94.34）")
     total_tax: Optional[str] = Field(default=None, description="发票合计税额（如：5.66）")
