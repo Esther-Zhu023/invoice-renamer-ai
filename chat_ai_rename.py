@@ -177,15 +177,14 @@ class ImageOcrExtractor:
     一个用于从图片或PDF文件中提取文本的封装类。
     """
 
-    def __init__(self, use_angle_cls: bool = True, lang: str = 'ch'):
+    def __init__(self, lang: str = 'ch'):
         """
         初始化OCR提取器，并加载PaddleOCR模型。
 
-        :param use_angle_cls: 是否使用文字方向分类器。
         :param lang: 指定OCR的语言，'ch'代表中文。
         """
-        # 在实际项目中，请使用下面这行
-        self.ocr = PaddleOCR(use_angle_cls=use_angle_cls, lang=lang)
+        # 使用新版API（不使用已废弃的use_angle_cls参数）
+        self.ocr = PaddleOCR(lang=lang)
 
     def _extract_text_from_single_image(self, image: Union[np.ndarray, Image.Image]) -> str:
         """
@@ -199,7 +198,7 @@ class ImageOcrExtractor:
             image = np.array(image)
 
         # 调用OCR进行识别
-        result = self.ocr.ocr(image, cls=True)
+        result = self.ocr.ocr(image)
 
         # 检查结果是否为空
         if not result or not result[0]:
