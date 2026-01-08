@@ -119,26 +119,35 @@ def main():
     files = [f for f in os.listdir(INPUT_FOLDER)
              if f.lower().endswith(supported_extensions)]
 
+    # 过滤掉保险单（没有实际支付金额）
+    files = [f for f in files if not f.lower().startswith('insurance')]
+
     if not files:
         print(f"❌ 在 {INPUT_FOLDER} 中没有找到支持的文件")
         return
 
-    # 🧪 测试模式：只处理前3个文件
-    TEST_MODE = True
-    # 测试PDF过滤：只测试PDF文件
-    TEST_PDF_ONLY = True  # 改为True测试PDF
+    # 小批量处理：只处理前20个文件
+    BATCH_MODE = True
+    BATCH_SIZE = 20
+    # 只处理PDF文件
+    PDF_ONLY = True  # 只处理PDF
 
-    if TEST_MODE:
-        if TEST_PDF_ONLY:
-            files = [f for f in files if f.lower().endswith('.pdf')][:3]
+    if BATCH_MODE:
+        if PDF_ONLY:
+            files = [f for f in files if f.lower().endswith('.pdf')][:BATCH_SIZE]
             if not files:
                 print("❌ 没有找到PDF文件")
                 return
         else:
-            files = files[:3]
-        print(f"🧪 测试模式：只处理前 {len(files)} 个文件\n")
+            files = files[:BATCH_SIZE]
+        print(f"📦 批量模式：只处理前 {len(files)} 个文件\n")
     else:
-        print(f"📂 找到 {len(files)} 个文件\n")
+        # 只处理PDF文件
+        if PDF_ONLY:
+            files = [f for f in files if f.lower().endswith('.pdf')]
+            print(f"📂 找到 {len(files)} 个PDF文件\n")
+        else:
+            print(f"📂 找到 {len(files)} 个文件\n")
     print("="*60)
 
     all_results = []
@@ -177,8 +186,50 @@ def main():
         output_path = os.path.join(INPUT_FOLDER, OUTPUT_EXCEL)
         df.to_excel(output_path, index=False, engine='openpyxl')
 
+        # 添加超链接到源文件
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font
+        from openpyxl.worksheet.hyperlink import Hyperlink
+
+        wb = load_workbook(output_path)
+        ws = wb.active
+
+        # 找到"源文件名"列的索引
+        header_row = 1
+        source_file_col = None
+        for col in range(1, ws.max_column + 1):
+            if ws.cell(row=header_row, column=col).value == "源文件名":
+                source_file_col = col
+                break
+
+        if source_file_col:
+            # 为每个源文件名添加超链接
+            for row in range(2, ws.max_row + 1):
+                cell = ws.cell(row=row, column=source_file_col)
+                source_filename = cell.value
+
+                if source_filename and not pd.isna(source_filename):
+                    # 从 "travel_493193.pdf (第1页)" 提取文件名
+                    filename = source_filename.split(' (')[0] if ' (' in source_filename else source_filename
+
+                    # 构建完整文件路径
+                    full_path = os.path.join(INPUT_FOLDER, filename)
+
+                    # 检查文件是否存在
+                    if os.path.exists(full_path):
+                        # 转换为文件路径URL格式（Mac）
+                        file_url = f"file://{full_path}"
+                        cell.hyperlink = Hyperlink(target=file_url, ref=cell.coordinate)
+                        cell.style = "Hyperlink"
+                        # 保持显示的文本不变
+                        cell.value = source_filename
+
+            # 保存修改
+            wb.save(output_path)
+
         print(f"✅ Excel已生成: {output_path}")
-        print(f"📄 共 {len(all_results)} 行数据\n")
+        print(f"📄 共 {len(all_results)} 行数据")
+        print(f"🔗 源文件名列已添加超链接，点击可直接打开原始文件\n")
 
         # 显示前5行预览
         print("="*60)

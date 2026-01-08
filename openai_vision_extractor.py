@@ -74,49 +74,62 @@ class OpenAIVisionExtractor:
         # 编码图片
         base64_image = self._encode_image(image_path)
 
-        try:
-            # 调用 GPT-4o Vision API
-            response = self.client.chat.completions.create(
-                model="gpt-4o",  # GPT-4o支持视觉
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
+        # 添加重试机制
+        import time
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                # 调用 GPT-4o Vision API
+                response = self.client.chat.completions.create(
+                    model="gpt-4o",  # GPT-4o支持视觉
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_image}"
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=2000  # 增加token以支持多收据
-            )
+                            ]
+                        }
+                    ],
+                    max_tokens=2000  # 增加token以支持多收据
+                )
 
-            # 提取响应
-            content = response.choices[0].message.content
+                # 提取响应
+                content = response.choices[0].message.content
 
-            # 解析JSON（支持数组或对象）
-            import re
-            json_match = re.search(r'\[.*\]|\{.*\}', content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                result = json.loads(json_str)
+                # 解析JSON（支持数组或对象）
+                import re
+                json_match = re.search(r'\[.*\]|\{.*\}', content, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    result = json.loads(json_str)
 
-                # 如果是单个对象，转换为数组
-                if isinstance(result, dict):
-                    return [result]
-                elif isinstance(result, list):
-                    return result
+                    # 如果是单个对象，转换为数组
+                    if isinstance(result, dict):
+                        return [result]
+                    elif isinstance(result, list):
+                        return result
+                    else:
+                        return [{"raw_text": content}]
                 else:
                     return [{"raw_text": content}]
-            else:
-                return [{"raw_text": content}]
 
-        except Exception as e:
-            return [{"error": str(e)}]
+            except Exception as e:
+                # 如果不是最后一次尝试，等待后重试
+                if attempt < max_retries - 1:
+                    print(f"  ⚠️ API调用失败，{2**attempt}秒后重试... (尝试 {attempt + 1}/{max_retries})")
+                    time.sleep(2**attempt)  # 指数退避：1秒, 2秒, 4秒
+                    continue
+                else:
+                    # 最后一次尝试失败，返回错误
+                    print(f"  ❌ API调用失败，已重试{max_retries}次")
+                    return [{"error": str(e)}]
 
     def extract_with_deep_structure(self, image_path: str) -> Dict:
         """
