@@ -38,8 +38,8 @@ def process_file(file_path: str, extractor: OpenAIVisionExtractor) -> list:
         if ext == '.pdf':
             print(f"  📄 PDF文件，转换为图片...")
             with tempfile.TemporaryDirectory() as temp_dir:
-                # 转换PDF为图片
-                images = convert_from_path(file_path, dpi=200)
+                # 转换PDF为图片（提高DPI以获得更清晰的识别）
+                images = convert_from_path(file_path, dpi=300)
 
                 all_receipts = []
                 for page_num, image in enumerate(images, 1):
@@ -95,17 +95,12 @@ def convert_receipt_to_row(receipt: dict) -> dict:
     :return: Excel行字典
     """
     return {
-        "店铺/公司名称": receipt.get("seller_name"),
         "日期": receipt.get("issue_date"),
-        "时间": receipt.get("issue_time"),
-        "发票号码": receipt.get("invoice_number"),
+        "店铺/公司名称": receipt.get("seller_name"),
         "价税合计": receipt.get("total_amount"),
-        "小计": receipt.get("subtotal"),
-        "税额": receipt.get("tax"),
         "货币": receipt.get("currency"),
-        "支付方式": receipt.get("payment_method"),
-        "商品列表": receipt.get("items"),
         "源文件名": receipt.get("源文件名"),
+        "商品列表": receipt.get("items"),
     }
 
 
@@ -168,10 +163,9 @@ def main():
 
         df = pd.DataFrame(all_results)
 
-        # 调整列顺序（把重要的放前面）
+        # 调整列顺序（只保留需要的列）
         priority_cols = [
-            "日期", "时间", "店铺/公司名称", "价税合计",
-            "小计", "税额", "发票号码", "支付方式", "源文件名"
+            "日期", "店铺/公司名称", "价税合计", "货币", "源文件名", "商品列表"
         ]
 
         # 确保列存在才排序
