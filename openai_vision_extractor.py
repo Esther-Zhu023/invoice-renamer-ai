@@ -35,16 +35,20 @@ class OpenAIVisionExtractor:
 
     def extract_from_image(self, image_path: str) -> Dict:
         """
-        从图片中提取收据信息
+        从图片中提取收据信息（支持多收据）
 
         :param image_path: 图片路径
-        :return: 提取的信息字典
+        :return: 提取的信息字典或字典列表
         """
-        # 构建提示词
+        # 构建提示词 - 支持多收据识别
         prompt = """
-请详细分析这张收据/发票图片，提取所有可见信息。
+请详细分析这张图片，识别其中的收据/发票信息。
 
-返回JSON格式，包含以下字段：
+**重要说明：**
+- 如果图片中有多个收据/发票，请返回JSON数组格式：[{收据1}, {收据2}, ...]
+- 如果只有一个收据/发票，返回单个JSON对象：{收据信息}
+
+返回JSON格式，每个收据包含以下字段：
 {
   "seller_name": "店铺或公司名称（保留原语言）",
   "issue_date": "日期（YYYY-MM-DD格式）",
@@ -59,6 +63,10 @@ class OpenAIVisionExtractor:
 }
 
 支持中文、英文、日文识别。如果某项信息不存在，设为null。
+
+**示例：**
+单个收据：{"seller_name": "星巴克", "total_amount": "50", ...}
+多个收据：[{"seller_name": "星巴克", ...}, {"seller_name": "7-11", ...}]
 
 只返回JSON，不要其他解释文字。
 """
@@ -84,23 +92,31 @@ class OpenAIVisionExtractor:
                         ]
                     }
                 ],
-                max_tokens=1000
+                max_tokens=2000  # 增加token以支持多收据
             )
 
             # 提取响应
             content = response.choices[0].message.content
 
-            # 解析JSON
+            # 解析JSON（支持数组或对象）
             import re
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            json_match = re.search(r'\[.*\]|\{.*\}', content, re.DOTALL)
             if json_match:
                 json_str = json_match.group(0)
-                return json.loads(json_str)
+                result = json.loads(json_str)
+
+                # 如果是单个对象，转换为数组
+                if isinstance(result, dict):
+                    return [result]
+                elif isinstance(result, list):
+                    return result
+                else:
+                    return [{"raw_text": content}]
             else:
-                return {"raw_text": content}
+                return [{"raw_text": content}]
 
         except Exception as e:
-            return {"error": str(e)}
+            return [{"error": str(e)}]
 
     def extract_with_deep_structure(self, image_path: str) -> Dict:
         """
